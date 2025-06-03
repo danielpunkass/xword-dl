@@ -46,6 +46,7 @@ def by_keyword(keyword: str, **kwargs) -> tuple[Puzzle, str]:
             "Selection by date not available for {}.".format(dl.outlet)
         )
 
+    print("Downloading %s" % puzzle_url)
     puzzle = dl.download(puzzle_url)
     filename = dl.pick_filename(puzzle)
 

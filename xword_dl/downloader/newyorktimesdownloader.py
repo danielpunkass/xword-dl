@@ -103,7 +103,7 @@ class NewYorkTimesDownloader(BaseDownloader):
             res.raise_for_status()
         except requests.exceptions.HTTPError as e:
             if res.status_code == 403:
-                raise XWordDLException('Puzzle data not available. Try re-authenticating with xword-dl nyt --authenticate')
+                raise XWordDLException('Puzzle data not available. Try re-authenticating with xword-dl nyt --authenticate' + solver_url)
             elif res.status_code == 404:
                 raise XWordDLException('Puzzle data not found.')
             else:
