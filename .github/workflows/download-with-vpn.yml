@@ -1,7 +1,7 @@
 name: Download Puzzles via VPN
 
 on:
-  pull-request:
+  push:
   workflow_dispatch:
     inputs:
       outlets:
