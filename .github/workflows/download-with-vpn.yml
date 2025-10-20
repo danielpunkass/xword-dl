@@ -1,0 +1,97 @@
+name: Download Puzzles via VPN
+
+on:
+  workflow_dispatch:
+    inputs:
+      outlets:
+        description: 'Puzzle outlets to download (comma-separated, e.g., "nyt,wsj,guardian")'
+        required: false
+        default: 'nyt'
+      use_vpn:
+        description: 'Route through VPN?'
+        required: true
+        default: true
+        type: boolean
+  schedule:
+    # Run daily at 6 AM UTC
+    - cron: '0 6 * * *'
+
+jobs:
+  download-puzzles:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: |
+          uv sync
+
+      - name: Connect to VPN
+        if: ${{ inputs.use_vpn == true || github.event_name == 'schedule' }}
+        id: vpn_connection
+        uses: kota65535/github-openvpn-connect-action@v3
+        with:
+          config_file: .github/vpn/client.ovpn
+          username: ${{ secrets.VPN_USERNAME }}
+          password: ${{ secrets.VPN_PASSWORD }}
+          client_key: ${{ secrets.VPN_CLIENT_KEY }}
+          tls_auth_key: ${{ secrets.VPN_TLS_KEY }}
+
+      - name: Verify VPN connection
+        if: ${{ inputs.use_vpn == true || github.event_name == 'schedule' }}
+        run: |
+          echo "=== VPN Connection Status ==="
+          echo "Connected: ${{ steps.vpn_connection.outputs.STATUS }}"
+          echo ""
+          echo "External IP:"
+          curl -s https://api.ipify.org
+          echo ""
+          echo "=========================="
+
+      - name: Download puzzles
+        env:
+          # Add any outlet-specific credentials here as secrets
+          # NYT_S: ${{ secrets.NYT_S }}
+          OUTLETS: ${{ inputs.outlets || 'nyt' }}
+        run: |
+          echo "=== Downloading Puzzles ==="
+          IFS=',' read -ra OUTLET_ARRAY <<< "$OUTLETS"
+
+          mkdir -p puzzles
+          cd puzzles
+
+          for outlet in "${OUTLET_ARRAY[@]}"; do
+            outlet=$(echo "$outlet" | xargs)  # trim whitespace
+            echo "Downloading from $outlet..."
+
+            if uv run xword-dl "$outlet" --latest; then
+              echo "✓ Successfully downloaded $outlet"
+            else
+              echo "✗ Failed to download $outlet" >&2
+            fi
+            echo ""
+          done
+
+          echo "=== Download Complete ==="
+          ls -lh
+
+      - name: Upload puzzle artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: puzzles-${{ github.run_number }}
+          path: puzzles/*.puz
+          retention-days: 30
+          if-no-files-found: warn
