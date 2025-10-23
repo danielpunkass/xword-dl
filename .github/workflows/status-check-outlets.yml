@@ -129,10 +129,9 @@ jobs:
           ssh-proxy-port: ${{ secrets.SSH_PROXY_PORT }}
           ssh-proxy-user: ${{ secrets.SSH_PROXY_USER }}
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          local-proxy-port: '1080'
       - name: Test New Yorker latest
         if: '!cancelled()'
-        run: xword-dl tny && echo $HTTPS_PROXY
+        run: xword-dl tny
  #      - name: Test New Yorker by date
 #         if: '!cancelled()'
 #         run: xword-dl tny -d "3/31/23"

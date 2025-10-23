@@ -15,10 +15,6 @@ inputs:
   ssh-private-key:
     description: 'SSH private key'
     required: true
-  local-proxy-port:
-    description: 'Local proxy port'
-    required: false
-    default: '1080'
 
 runs:
   using: 'composite'
@@ -38,7 +34,7 @@ runs:
         cat /proc/$$/status | grep NSpid || true
 
         # Start SSH tunnel in background and capture PID
-        ssh -S /tmp/tunnel-socket -N -D 0.0.0.0:"${{ inputs.local-proxy-port || 1080 }}" \
+        ssh -S /tmp/tunnel-socket -N -D 0.0.0.0:1080 \
           -o ExitOnForwardFailure=yes \
           -o StrictHostKeyChecking=accept-new \
           -o ServerAliveInterval=30 \
@@ -54,7 +50,7 @@ runs:
         # Wait for the SOCKS proxy to open (max 30 seconds)
         MAX_ATTEMPTS=300
         ATTEMPT=0
-        TARGET="/dev/tcp/127.0.0.1/${{ inputs.local-proxy-port }}"
+        TARGET="/dev/tcp/127.0.0.1/1080"
 
         while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
           if (echo > "$TARGET") >/dev/null 2>&1; then
@@ -68,7 +64,7 @@ runs:
 
         # Final verification
         if ! (echo > "$TARGET"); then
-          echo "ERROR: SOCKS port ${{ inputs.local-proxy-port }} failed to become available"
+          echo "ERROR: SOCKS port 1080 failed to become available"
           kill "$SSH_PID" 2>/dev/null || true
           exit 1
         fi
@@ -76,8 +72,7 @@ runs:
         # Export environment variables for later steps
         {
           echo "SSH_TUNNEL_PID=$SSH_PID"
-          echo "SOCKS_PORT=${{ inputs.local-proxy-port }}"
-          echo "HTTPS_PROXY=socks5h://127.0.0.1:${{ inputs.local-proxy-port }}"
+          echo "HTTPS_PROXY=socks5h://127.0.0.1:1080/"
         } >> "$GITHUB_ENV"
 
         echo "SSH tunnel established and environment configured."
