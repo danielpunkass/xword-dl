@@ -34,7 +34,7 @@ runs:
         cat /proc/$$/status | grep NSpid || true
 
         # Start SSH tunnel in background and capture PID
-        ssh -S /tmp/tunnel-socket -N -D 0.0.0.0:1080 \
+        ssh -f -S /tmp/tunnel-socket -N -D 0.0.0.0:1080 \
           -o ExitOnForwardFailure=yes \
           -o StrictHostKeyChecking=accept-new \
           -o ServerAliveInterval=30 \
