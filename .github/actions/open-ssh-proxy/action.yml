@@ -11,10 +11,10 @@ inputs:
     default: '22'
   ssh-proxy-user:
     description: 'SSH proxy username'
-    required: false
+    required: true
   ssh-private-key:
     description: 'SSH private key'
-    required: false
+    required: true
   local-proxy-port:
     description: 'Local proxy port'
     required: false
