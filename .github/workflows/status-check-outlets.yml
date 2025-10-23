@@ -132,7 +132,7 @@ jobs:
           local-proxy-port: '1080'
       - name: Test New Yorker latest
         if: '!cancelled()'
-        run: xword-dl tny
+        run: xword-dl tny && echo $HTTPS_PROXY
  #      - name: Test New Yorker by date
 #         if: '!cancelled()'
 #         run: xword-dl tny -d "3/31/23"

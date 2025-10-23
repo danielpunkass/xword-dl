@@ -61,15 +61,16 @@ runs:
             echo "Proxy port is open"
             break
           fi
-          sleep 0.1
+          echo waiting ...
+          sleep 0.1          
           ATTEMPT=$((ATTEMPT + 1))
         done
 
         # Final verification
         if ! (echo > "$TARGET"); then
           echo "ERROR: SOCKS port ${{ inputs.local-proxy-port }} failed to become available"
-          # kill "$SSH_PID" 2>/dev/null || true
-          # exit 1
+          kill "$SSH_PID" 2>/dev/null || true
+          exit 1
         fi
 
         # Export environment variables for later steps

@@ -1,0 +1,111 @@
+name: 'Install OpenVPN'
+description: 'Installs OpenVPN and creates helper commands (open-vpn, close-vpn) for workflow scripts'
+
+inputs:
+  openvpn_config:
+    description: 'Base64-encoded OpenVPN configuration file'
+    required: true
+
+outputs:
+  vpn_scripts_path:
+    description: 'Path to directory containing VPN helper scripts'
+    value: '/tmp/vpn'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install OpenVPN
+      shell: bash
+      run: |
+        if ! command -v openvpn &> /dev/null; then
+          echo "Installing OpenVPN..."
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends openvpn
+        else
+          echo "OpenVPN is already installed"
+          openvpn --version
+        fi
+
+    - name: Setup VPN configuration and helper scripts
+      shell: bash
+      run: |
+        mkdir -p /tmp/vpn
+
+        # Decode and save OpenVPN config
+        echo "${{ inputs.openvpn_config }}" | base64 -d > /tmp/vpn/client.ovpn
+        chmod 600 /tmp/vpn/client.ovpn
+
+        # Create open-vpn helper script
+        cat > /tmp/vpn/open-vpn << 'EOF'
+        #!/bin/bash
+        set -e
+
+        if ip addr show tun0 &> /dev/null; then
+          echo "VPN is already connected"
+          exit 0
+        fi
+
+        cd /tmp/vpn
+
+        echo "Connecting to VPN..."
+        sudo openvpn --config client.ovpn \
+          --daemon \
+          --log openvpn.log \
+          --writepid openvpn.pid
+
+        # Wait for VPN connection
+        echo "Waiting for VPN connection..."
+        for i in {1..30}; do
+          if ip addr show tun0 &> /dev/null; then
+            echo "✓ VPN connected!"
+            echo "External IP: $(curl -s https://api.ipify.org)"
+            exit 0
+          fi
+          sleep 1
+        done
+
+        echo "✗ VPN connection failed!"
+        cat openvpn.log
+        exit 1
+        EOF
+
+        chmod +x /tmp/vpn/open-vpn
+
+        # Create close-vpn helper script
+        cat > /tmp/vpn/close-vpn << 'EOF'
+        #!/bin/bash
+        set -e
+
+        if ! ip addr show tun0 &> /dev/null; then
+          echo "VPN is not connected"
+          exit 0
+        fi
+
+        echo "Disconnecting from VPN..."
+
+        # Kill OpenVPN process
+        if sudo killall openvpn 2>/dev/null; then
+          echo "OpenVPN process terminated"
+        fi
+
+        # Wait for interface to go down
+        for i in {1..10}; do
+          if ! ip addr show tun0 &> /dev/null; then
+            echo "✓ VPN disconnected"
+            exit 0
+          fi
+          sleep 1
+        done
+
+        echo "Warning: VPN interface still present"
+        exit 1
+        EOF
+
+        chmod +x /tmp/vpn/close-vpn
+
+        # Add /tmp/vpn to PATH for subsequent steps
+        echo "/tmp/vpn" >> $GITHUB_PATH
+
+        echo "✓ OpenVPN installed and configured"
+        echo "✓ Helper scripts created: open-vpn, close-vpn"
+        echo "✓ Scripts added to PATH"
