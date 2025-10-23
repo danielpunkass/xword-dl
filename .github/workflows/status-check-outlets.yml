@@ -1,6 +1,7 @@
 name: Status check on supported outlets
 
 on:
+  workflow_dispatch:
   pull_request:
     branches: [ main ]
   schedule:
