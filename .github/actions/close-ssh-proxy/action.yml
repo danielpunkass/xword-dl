@@ -1,0 +1,19 @@
+name: 'Cleanup SSH SOCKS Proxy'
+description: 'Closes the SSH proxy tunnel if one was previously established'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Cleanup SSH tunnel
+      if: env.SSH_TUNNEL_PID != ''
+      shell: bash
+      run: |
+        echo "Closing SSH tunnel (PID: $SSH_TUNNEL_PID)..."
+
+        if [ -n "$SSH_TUNNEL_PID" ]; then
+          kill $SSH_TUNNEL_PID 2>/dev/null || true
+          echo "SSH tunnel closed"
+        fi
+
+        # Clean up SSH key
+        rm -f ~/.ssh/xword_proxy_key

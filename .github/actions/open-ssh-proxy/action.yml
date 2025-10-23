@@ -1,0 +1,82 @@
+name: 'Open SSH Proxy Tunnel'
+description: 'Opens an SSH proxy tunnel for subsequent Python network requests'
+
+inputs:
+  ssh-proxy-host:
+    description: 'Hostname or IP address of a server through which an SSH tunnel will be established'
+    required: false
+  ssh-proxy-port:
+    description: 'SSH proxy port'
+    required: false
+    default: '22'
+  ssh-proxy-user:
+    description: 'SSH proxy username'
+    required: false
+  ssh-private-key:
+    description: 'SSH private key'
+    required: false
+  local-proxy-port:
+    description: 'Local proxy port'
+    required: false
+    default: '1080'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup SSH tunnel
+      if: ${{ inputs.ssh-proxy-host != '' }}
+      shell: bash
+      run: |
+        echo "Opening SSH proxy tunnel..."
+
+        # Create SSH key file
+        mkdir -p ~/.ssh
+        echo "${{ inputs.ssh-private-key }}" > ~/.ssh/xword_proxy_key
+        chmod 600 ~/.ssh/xword_proxy_key
+
+        echo "Container PID: $$"
+        cat /proc/$$/status | grep NSpid || true
+
+        # Start SSH tunnel in background and capture PID
+        ssh -S /tmp/tunnel-socket -N -D 0.0.0.0:"${{ inputs.local-proxy-port || 1080 }}" \
+          -o ExitOnForwardFailure=yes \
+          -o StrictHostKeyChecking=accept-new \
+          -o ServerAliveInterval=30 \
+          -o ServerAliveCountMax=3 \
+          -i ~/.ssh/xword_proxy_key \
+          -p "${{ inputs.ssh-proxy-port || 1080 }}" \
+          "${{ inputs.ssh-proxy-user }}@${{ inputs.ssh-proxy-host }}" &
+        SSH_PID=$!
+
+        echo "SSH tunnel started (PID: $SSH_PID)"
+        echo "Waiting for proxy port to become available..."
+
+        # Wait for the SOCKS proxy to open (max 30 seconds)
+        MAX_ATTEMPTS=300
+        ATTEMPT=0
+        TARGET="/dev/tcp/127.0.0.1/${{ inputs.local-proxy-port }}"
+
+        while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+          if (echo > "$TARGET") >/dev/null 2>&1; then
+            echo "Proxy port is open"
+            break
+          fi
+          sleep 0.1
+          ATTEMPT=$((ATTEMPT + 1))
+        done
+
+        # Final verification
+        if ! (echo > "$TARGET"); then
+          echo "ERROR: SOCKS port ${{ inputs.local-proxy-port }} failed to become available"
+          # kill "$SSH_PID" 2>/dev/null || true
+          # exit 1
+        fi
+
+        # Export environment variables for later steps
+        {
+          echo "SSH_TUNNEL_PID=$SSH_PID"
+          echo "SOCKS_PORT=${{ inputs.local-proxy-port }}"
+          echo "HTTPS_PROXY=socks5h://127.0.0.1:${{ inputs.local-proxy-port }}"
+        } >> "$GITHUB_ENV"
+
+        echo "SSH tunnel established and environment configured."
