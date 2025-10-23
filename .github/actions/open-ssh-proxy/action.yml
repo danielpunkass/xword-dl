@@ -44,7 +44,7 @@ runs:
           -o ServerAliveInterval=30 \
           -o ServerAliveCountMax=3 \
           -i ~/.ssh/xword_proxy_key \
-          -p "${{ inputs.ssh-proxy-port || 1080 }}" \
+          -p "${{ inputs.ssh-proxy-port }}" \
           "${{ inputs.ssh-proxy-user }}@${{ inputs.ssh-proxy-host }}" &
         SSH_PID=$!
 
